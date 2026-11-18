@@ -32,3 +32,31 @@
 @keyframes burstIn{from{transform:scale(.3) rotate(-18deg)}to{transform:scale(1) rotate(0)}}
 @keyframes rematchPulse{0%,100%{box-shadow:0 0 0 1px #d7f28a55,0 8px 28px #b8d85c25}50%{box-shadow:0 0 0 3px #d7f28a88,0 8px 36px #b8d85c55}}
 @media(prefers-reduced-motion:reduce){#result.result,.result-card,.result-burst,.rematch-cta{animation:none}}
+
+/* Wordle-style on-screen keyboard */
+.game-keyboard{width:min(100%,520px);margin:22px auto 12px;display:grid;gap:8px;user-select:none;-webkit-user-select:none}
+.key-row{display:flex;justify-content:center;gap:5px}
+.game-key{flex:1;min-width:0;height:48px;padding:0 2px;border:0;border-radius:5px;background:#85878a;color:#fff;font:600 14px 'Space Grotesk',sans-serif;cursor:pointer;touch-action:manipulation;transition:background .15s,transform .08s}
+.game-key:active{transform:scale(.95)}
+.game-key.correct{background:#718d43!important;color:#fff}
+.game-key.present{background:#b39a43!important;color:#fff}
+.game-key.absent{background:#41443e!important;color:#fff}
+.game-key.key-wide{flex:1.5;font-size:10px;letter-spacing:.02em;background:#686b6d}
+.game-key.key-wide:last-child{font-size:22px}
+.rules-toggle{display:flex;align-items:center;gap:9px;border:1px solid #45483d;background:transparent;color:#d4d8c8;border-radius:22px;padding:8px 12px;font:10px 'DM Mono',monospace;cursor:pointer;margin:14px 0 0}
+.rules-toggle:hover{border-color:#b8d85c;color:#b8d85c}
+.side-panel .legend{margin:10px 0 18px;padding:13px 0}
+@media(max-width:760px){
+ .app{padding-left:12px;padding-right:12px}.game-wrap{padding-top:22px;padding-bottom:42px}.game-head{margin-bottom:17px}
+ .game-head h2{font-size:31px}.game-head .ghost{padding:9px 10px;font-size:10px}
+ .players{margin-bottom:14px}.player-card{min-width:0}.player-card strong{max-width:92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .play-grid{display:flex;flex-direction:column;gap:14px;margin-top:14px}.guess-panel{padding:13px 10px 16px;order:0}
+ .panel-heading h3{font-size:17px}.board{width:min(100%,360px);margin:16px auto}
+ .board .tiles{gap:5px;margin:6px 0}.board .tiles b{width:auto;flex:1;aspect-ratio:1/1;height:auto;max-width:64px;font-size:clamp(18px,6vw,26px)}
+ .game-keyboard{width:100%;max-width:520px;gap:7px;margin:17px auto 8px}.key-row{gap:4px}
+ .game-key{height:clamp(43px,12vw,58px);font-size:clamp(12px,3.8vw,16px);border-radius:5px}
+ .game-key.key-wide{flex:1.5;font-size:clamp(9px,2.7vw,12px)}.game-key.key-wide:last-child{font-size:20px}
+ .hint{font-size:8px;margin-top:10px}.side-panel{order:1;padding:17px}.side-panel>p{margin-bottom:8px}
+ .side-panel .legend{margin:10px 0 15px}.opponent-log{margin-top:16px}.mini-word-row b{width:30px;height:30px;font-size:12px}
+}
+@media(min-width:761px){.game-keyboard{max-width:420px}.game-key{height:42px}}
