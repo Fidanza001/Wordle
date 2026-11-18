@@ -5,7 +5,8 @@ const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SE
 const random = (n: number) => Array.from(crypto.getRandomValues(new Uint8Array(n)), x => "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[x % 36]).join("");
 const token = () => random(40) + crypto.randomUUID().replaceAll("-", "");
 const digest = async (s: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))).map(x => x.toString(16).padStart(2,"0")).join("");
-const word = (s: unknown) => typeof s === "string" && /^[A-Z]{5}$/.test(s);
+const validWords = new Set((await Deno.readTextFile(new URL("./words.txt", import.meta.url))).trim().split(/\s+/));
+const word = (s: unknown) => typeof s === "string" && /^[A-Z]{5}$/.test(s) && validWords.has(s.toLowerCase());
 function score(g: string, a: string) { const ans=a.split(""), letters=g.split(""), tiles=Array(5).fill("absent"); letters.forEach((c,i)=>{if(c===ans[i]){tiles[i]="correct";ans[i]="";letters[i]=""}});letters.forEach((c,i)=>{if(c){const j=ans.indexOf(c);if(j>=0){tiles[i]="present";ans[j]=""}}});return tiles; }
 Deno.serve(async req => {
  if(req.method==="OPTIONS") return new Response("ok",{headers:cors});
@@ -33,17 +34,17 @@ Deno.serve(async req => {
   const ownWord=side==="host"?r.host_word:r.guest_word, theirWord=side==="host"?r.guest_word:r.host_word;
   const ownGuesses=(side==="host"?r.host_guesses:r.guest_guesses) as string[], theirGuesses=(side==="host"?r.guest_guesses:r.host_guesses) as string[];
   if(action==="set-word"){
-   const w=String(b.word||"");if(!word(w))return reply({error:"Secret word must be exactly five letters."},400);if(ownWord)return reply({error:"Your secret word is already locked."},409);
+   const w=String(b.word||"");if(!word(w))return reply({error:"Secret word must be a valid five-letter Wordle word."},400);if(ownWord)return reply({error:"Your secret word is already locked."},409);
    const field=side==="host"?"host_word":"guest_word";const{error:e}=await db.from("word_wars_rooms").update({[field]:w}).eq("code",code);if(e)throw e;return reply({ok:true});
   }
   if(action==="guess"){
-   const w=String(b.word||"");if(!word(w))return reply({error:"Guess must be exactly five letters."},400);if(!ownWord||!theirWord)return reply({error:"Both players must lock in their words first."},409);
+   const w=String(b.word||"");if(!word(w))return reply({error:"Not a valid Wordle word. Please enter a real five-letter dictionary word."},400);if(!ownWord||!theirWord)return reply({error:"Both players must lock in their words first."},409);
    if(ownGuesses.length>=6)return reply({error:"No attempts remaining."},409);if(ownGuesses.includes(w))return reply({error:"You already tried that word."},409);
    const field=side==="host"?"host_guesses":"guest_guesses";const{error:e}=await db.from("word_wars_rooms").update({[field]:[...ownGuesses,w]}).eq("code",code);if(e)throw e;return reply({ok:true});
   }
   if(action==="state"){
    const won=!!theirWord&&ownGuesses.includes(theirWord), opponentSolved=!!ownWord&&theirGuesses.includes(ownWord), finished=won||opponentSolved||ownGuesses.length>=6||theirGuesses.length>=6;
-   return reply({side,opponentName:side==="host"?r.guest_name:r.host_name,myWordSet:!!ownWord,opponentWordSet:!!theirWord,guesses:theirWord?ownGuesses.map(g=>({word:g,tiles:score(g,theirWord)})):[],opponentAttempts:theirGuesses.length,opponentSolved,finished,won,opponentWord:finished?theirWord:null});
+   return reply({side,opponentName:side==="host"?r.guest_name:r.host_name,myWordSet:!!ownWord,opponentWordSet:!!theirWord,guesses:theirWord?ownGuesses.map(g=>({word:g,tiles:score(g,theirWord)})):[],opponentGuesses:ownWord?theirGuesses.map(g=>({word:g,tiles:score(g,ownWord)})):[],opponentAttempts:theirGuesses.length,opponentSolved,finished,won,opponentWord:finished?theirWord:null});
   }
   return reply({error:"Unknown action."},400);
  } catch(e) { console.error(e); return reply({error:"Server error. Please try again."},500); }
