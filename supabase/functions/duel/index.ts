@@ -5,13 +5,15 @@ const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SE
 const random = (n: number) => Array.from(crypto.getRandomValues(new Uint8Array(n)), x => "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[x % 36]).join("");
 const token = () => random(40) + crypto.randomUUID().replaceAll("-", "");
 const digest = async (s: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))).map(x => x.toString(16).padStart(2,"0")).join("");
-const validWords = new Set((await Deno.readTextFile(new URL("./words.txt", import.meta.url))).trim().split(/\s+/));
-const word = (s: unknown) => typeof s === "string" && /^[A-Z]{5}$/.test(s) && validWords.has(s.toLowerCase());
+let dictionaryPromise: Promise<Set<string>> | null = null;
+const getValidWords = () => dictionaryPromise ??= Deno.readTextFile(new URL("./words.txt", import.meta.url)).then(text => new Set(text.trim().split(/\s+/)));
+const word = (s: unknown, words: Set<string>) => typeof s === "string" && /^[A-Z]{5}$/.test(s) && words.has(s.toLowerCase());
 function score(g: string, a: string) { const ans=a.split(""), letters=g.split(""), tiles=Array(5).fill("absent"); letters.forEach((c,i)=>{if(c===ans[i]){tiles[i]="correct";ans[i]="";letters[i]=""}});letters.forEach((c,i)=>{if(c){const j=ans.indexOf(c);if(j>=0){tiles[i]="present";ans[j]=""}}});return tiles; }
 Deno.serve(async req => {
  if(req.method==="OPTIONS") return new Response("ok",{headers:cors});
  if(req.method!=="POST") return reply({error:"POST required"},405);
  try {
+  const words = await getValidWords();
   const b=await req.json(), action=b.action;
   if(action==="create"){
    const name=String(b.name||"").trim().slice(0,24); if(!name) return reply({error:"Enter your name."},400);
@@ -34,11 +36,11 @@ Deno.serve(async req => {
   const ownWord=side==="host"?r.host_word:r.guest_word, theirWord=side==="host"?r.guest_word:r.host_word;
   const ownGuesses=(side==="host"?r.host_guesses:r.guest_guesses) as string[], theirGuesses=(side==="host"?r.guest_guesses:r.host_guesses) as string[];
   if(action==="set-word"){
-   const w=String(b.word||"");if(!word(w))return reply({error:"Secret word must be a valid five-letter Wordle word."},400);if(ownWord)return reply({error:"Your secret word is already locked."},409);
+   const w=String(b.word||"");if(!word(w,words))return reply({error:"Secret word must be a valid five-letter Wordle word."},400);if(ownWord)return reply({error:"Your secret word is already locked."},409);
    const field=side==="host"?"host_word":"guest_word";const{error:e}=await db.from("word_wars_rooms").update({[field]:w}).eq("code",code);if(e)throw e;return reply({ok:true});
   }
   if(action==="guess"){
-   const w=String(b.word||"");if(!word(w))return reply({error:"Not a valid Wordle word. Please enter a real five-letter dictionary word."},400);if(!ownWord||!theirWord)return reply({error:"Both players must lock in their words first."},409);
+   const w=String(b.word||"");if(!word(w,words))return reply({error:"Not a valid Wordle word. Please enter a real five-letter dictionary word."},400);if(!ownWord||!theirWord)return reply({error:"Both players must lock in their words first."},409);
    if(ownGuesses.length>=6)return reply({error:"No attempts remaining."},409);if(ownGuesses.includes(w))return reply({error:"You already tried that word."},409);
    const field=side==="host"?"host_guesses":"guest_guesses";const{error:e}=await db.from("word_wars_rooms").update({[field]:[...ownGuesses,w]}).eq("code",code);if(e)throw e;return reply({ok:true});
   }
