@@ -14891,14 +14891,45 @@ Deno.serve(async req => {
    const w=String(b.word||"");if(!word(w))return reply({error:"Secret word must be a valid five-letter Wordle word."},400);if(ownWord)return reply({error:"Your secret word is already locked."},409);
    const field=side==="host"?"host_word":"guest_word";const{error:e}=await db.from("word_wars_rooms").update({[field]:w}).eq("code",code);if(e)throw e;return reply({ok:true});
   }
+  if(action==="ready"){
+   if(!ownWord||!theirWord)return reply({error:"Both players must lock in their words first."},409);
+   const readyField=side==="host"?"host_ready":"guest_ready";
+   const{error:e}=await db.from("word_wars_rooms").update({[readyField]:true}).eq("code",code);if(e)throw e;
+   const{data:fresh,error:fe}=await db.from("word_wars_rooms").select("host_ready,guest_ready,game_started_at").eq("code",code).single();if(fe)throw fe;
+   if(fresh.host_ready&&fresh.guest_ready&&!fresh.game_started_at){const{error:se}=await db.from("word_wars_rooms").update({game_started_at:new Date().toISOString()}).eq("code",code).is("game_started_at",null);if(se)throw se;}
+   return reply({ok:true});
+  }
   if(action==="guess"){
    const w=String(b.word||"");if(!word(w))return reply({error:"Not a valid Wordle word. Please enter a real five-letter dictionary word."},400);if(!ownWord||!theirWord)return reply({error:"Both players must lock in their words first."},409);
+   if(!r.game_started_at)return reply({error:"Both players must be ready before the round starts."},409);
+   const ownDone=side==="host"?r.host_finished_at:r.guest_finished_at;if(ownDone)return reply({error:"Your round is already complete."},409);
    if(ownGuesses.length>=6)return reply({error:"No attempts remaining."},409);if(ownGuesses.includes(w))return reply({error:"You already tried that word."},409);
-   const field=side==="host"?"host_guesses":"guest_guesses";const{error:e}=await db.from("word_wars_rooms").update({[field]:[...ownGuesses,w]}).eq("code",code);if(e)throw e;return reply({ok:true});
+   const next=[...ownGuesses,w],solved=w===theirWord,done=solved||next.length>=6,field=side==="host"?"host_guesses":"guest_guesses",finishedField=side==="host"?"host_finished_at":"guest_finished_at";
+   const patch:any={[field]:next};if(done)patch[finishedField]=new Date().toISOString();
+   const{error:e}=await db.from("word_wars_rooms").update(patch).eq("code",code);if(e)throw e;return reply({ok:true,finished:done});
+  }
+  if(action==="rematch"){
+   if(!r.host_finished_at||!r.guest_finished_at)return reply({error:"Both players must finish the round before requesting a rematch."},409);
+   if(r.rematch_requested_by)return reply({error:"A rematch request is already pending."},409);
+   const{error:e}=await db.from("word_wars_rooms").update({rematch_requested_by:side}).eq("code",code);if(e)throw e;return reply({ok:true});
+  }
+  if(action==="rematch-accept"){
+   if(!r.rematch_requested_by||r.rematch_requested_by===side)return reply({error:"There is no opponent rematch request to accept."},409);
+   const{error:e}=await db.from("word_wars_rooms").update({host_word:null,guest_word:null,host_guesses:[],guest_guesses:[],host_ready:false,guest_ready:false,game_started_at:null,host_finished_at:null,guest_finished_at:null,rematch_requested_by:null}).eq("code",code);if(e)throw e;return reply({ok:true});
+  }
+  if(action==="rematch-cancel"){
+   if(r.rematch_requested_by!==side)return reply({error:"You do not have a pending rematch request."},409);
+   const{error:e}=await db.from("word_wars_rooms").update({rematch_requested_by:null}).eq("code",code);if(e)throw e;return reply({ok:true});
   }
   if(action==="state"){
-   const won=!!theirWord&&ownGuesses.includes(theirWord), opponentSolved=!!ownWord&&theirGuesses.includes(ownWord), finished=won||opponentSolved||ownGuesses.length>=6||theirGuesses.length>=6;
-   return reply({side,opponentName:side==="host"?r.guest_name:r.host_name,myWordSet:!!ownWord,opponentWordSet:!!theirWord,guesses:theirWord?ownGuesses.map(g=>({word:g,tiles:score(g,theirWord)})):[],opponentGuesses:ownWord?theirGuesses.map(g=>({word:g,tiles:score(g,ownWord)})):[],opponentAttempts:theirGuesses.length,opponentSolved,finished,won,opponentWord:finished?theirWord:null});
+   const started=!!r.game_started_at,myReady=side==="host"?!!r.host_ready:!!r.guest_ready,opponentReady=side==="host"?!!r.guest_ready:!!r.host_ready;
+   const myFinished=!!(side==="host"?r.host_finished_at:r.guest_finished_at),opponentFinished=!!(side==="host"?r.guest_finished_at:r.host_finished_at),finished=started&&myFinished&&opponentFinished;
+   const elapsed=(stamp:string|null)=>stamp&&r.game_started_at?Math.max(1,Math.round((new Date(stamp).getTime()-new Date(r.game_started_at).getTime())/1000)):null;
+   const hostTime=elapsed(r.host_finished_at),guestTime=elapsed(r.guest_finished_at),attemptPoints=(n:number)=>[0,70,58,46,34,22,10][Math.min(6,Math.max(0,n))];
+   let hostScore:number|null=null,guestScore:number|null=null,hostTimePoints:number|null=null,guestTimePoints:number|null=null,hostAttempts=0,guestAttempts=0;
+   if(finished){hostAttempts=(r.host_guesses||[]).length;guestAttempts=(r.guest_guesses||[]).length;const x=hostTime||1,y=guestTime||1;hostTimePoints=15+7.5*(y-x)/(x+y);guestTimePoints=30-hostTimePoints;hostScore=attemptPoints(hostAttempts)+hostTimePoints;guestScore=attemptPoints(guestAttempts)+guestTimePoints;}
+   const myAttempts=ownGuesses.length,opponentAttempts=theirGuesses.length,myTime=side==="host"?hostTime:guestTime,opponentTime=side==="host"?guestTime:hostTime,myScore=side==="host"?hostScore:guestScore,opponentScore=side==="host"?guestScore:hostScore,myTimePoints=side==="host"?hostTimePoints:guestTimePoints,opponentTimePoints=side==="host"?guestTimePoints:hostTimePoints;
+   return reply({side,rematchRequestedBy:r.rematch_requested_by||null,opponentName:side==="host"?r.guest_name:r.host_name,myWordSet:!!ownWord,opponentWordSet:!!theirWord,myReady,opponentReady,started,guesses:theirWord?ownGuesses.map(g=>({word:g,tiles:score(g,theirWord)})):[],opponentGuesses:ownWord?theirGuesses.map(g=>({word:g,tiles:score(g,ownWord)})):[],opponentAttempts,opponentSolved:!!ownWord&&theirGuesses.includes(ownWord),myFinished,opponentFinished,finished,won:finished&&Number(myScore)>Number(opponentScore),draw:finished&&myScore===opponentScore,opponentWord:finished?theirWord:null,myAttempts,attemptPoints:finished?attemptPoints(myAttempts):null,opponentAttemptPoints:finished?attemptPoints(opponentAttempts):null,myTime,opponentTime,myTimePoints,opponentTimePoints,myScore,opponentScore});
   }
   return reply({error:"Unknown action."},400);
  } catch(e) { console.error(e); return reply({error:"Server error. Please try again."},500); }
