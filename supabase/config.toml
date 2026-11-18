@@ -1,0 +1,4 @@
+project_id = "word-wars"
+
+[functions.duel]
+verify_jwt = false
