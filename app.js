@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id);let session=null,room=null,side=null,playerName='',poller=null,demo=false;
 const params=new URLSearchParams(location.search);if(params.get('room')){$('roomCode').value=params.get('room').toUpperCase();document.querySelector('#join').scrollIntoView({behavior:'smooth'});}
-const cfg=()=>({url:localStorage.getItem('ww_url')||'',key:localStorage.getItem('ww_key')||''});
+const cfg=()=>({url:window.WORD_WARS_CONFIG?.supabaseUrl||localStorage.getItem('ww_url')||'',key:window.WORD_WARS_CONFIG?.supabaseAnonKey||localStorage.getItem('ww_key')||''});
 function toast(s){$('toast').textContent=s;$('toast').classList.remove('hidden');clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').classList.add('hidden'),3200)}
 function clean(s){return(s||'').toUpperCase().replace(/[^A-Z]/g,'').slice(0,5)}
 function hashGuess(g,a){const ans=a.split(''),out=Array(5).fill('absent'),letters=g.split('');letters.forEach((c,i)=>{if(c===ans[i]){out[i]='correct';ans[i]=null;letters[i]=null}});letters.forEach((c,i)=>{if(c){const j=ans.indexOf(c);if(j>-1){out[i]='present';ans[j]=null}}});return out}
