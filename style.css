@@ -9,3 +9,6 @@
 .typing-proxy{position:fixed;left:8px;bottom:8px;width:2px;height:2px;min-width:2px;min-height:2px;padding:0;margin:0;border:0;opacity:.01;background:transparent;color:transparent;font-size:16px;z-index:1;caret-color:transparent;pointer-events:none}
 .board{cursor:pointer;user-select:none;-webkit-user-select:none}
 @media(hover:none){.board .tiles b{touch-action:manipulation}}
+
+/* Visible mobile-friendly guess field: keeps typing in view above the native keyboard. */
+.guess-type-input{display:block;width:100%;max-width:315px;height:48px;margin:0 auto 8px;padding:0 14px;border:1px solid #596044;border-radius:4px;background:#11130f;color:#f4f2e9;font:14px 'DM Mono',monospace;letter-spacing:.16em;text-align:center;text-transform:uppercase;outline:none;scroll-margin:12px}.guess-type-input:focus{border-color:#b8d85c;box-shadow:0 0 0 2px #b8d85c22}.guess-type-input::placeholder{color:#777d6d;font-size:10px;letter-spacing:.1em}
