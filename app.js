@@ -60,5 +60,5 @@ document.addEventListener('keydown',e=>{
  if(e.key==='Backspace'){e.preventDefault();currentGuess=currentGuess.slice(0,-1);$('typingInput').value=currentGuess;renderBoard(window.lastRows||[],currentGuess);return;}
  if(/^[a-zA-Z]$/.test(e.key)&&currentGuess.length<5){currentGuess+=e.key.toUpperCase();$('typingInput').value=currentGuess;renderBoard(window.lastRows||[],currentGuess);}
 });
-$('typingInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();submitGuess();}});
+
 $('rematchAcceptBtn').onclick=acceptRematch;$('rematchCancelBtn').onclick=cancelRematch;$('inviteBtn').onclick=invite;$('waitingInvite').onclick=invite;$('demoBtn').onclick=demoStart;$('leaveBtn').onclick=backToLobby;$('connection').innerHTML='<i style="background:#d89b55"></i> BACKEND NOT CONFIGURED';
